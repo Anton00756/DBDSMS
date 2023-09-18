@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  zookeeper:
+    extends:
+      file: docker-compose.yaml
+      service: zookeeper
+
+  kafka:
+    extends:
+      file: docker-compose.yaml
+      service: kafka
+
+  init-kafka:
+    extends:
+      file: docker-compose.yaml
+      service: init-kafka
+
+  pyflink:
+    extends:
+      file: docker-compose.yaml
+      service: pyflink
+    volumes:
+      - ${PWD}/services/pyflink/.:/work_dir
+
+  data_generator:
+    extends:
+      file: docker-compose.yaml
+      service: data_generator
+    volumes:
+      - ${PWD}/services/data_generator/.:/work_dir
+
+volumes:
+  zookeeper_data:
+    driver: local
+  kafka_data:
+    driver: local
+
+networks:
+  node-network:
+    driver: bridge

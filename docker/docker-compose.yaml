@@ -1,0 +1,96 @@
+version: "3.9"
+
+services:
+  zookeeper:
+    image: docker.io/bitnami/zookeeper:3.8
+    container_name: zookeeper
+    restart: always
+    ports:
+      - "2181:2181"
+    volumes:
+      - "zookeeper_data:/bitnami"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - node-network
+  kafka:
+    image: docker.io/bitnami/kafka:3.3.1-debian-11-r38
+    container_name: kafka
+    restart: always
+    ports:
+      - "9092:9092"
+    volumes:
+      - "kafka_data:/bitnami"
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
+      - KAFKA_LISTENERS=EXTERNAL_SAME_HOST://:29092,INTERNAL://:9092
+      - KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka:9092,EXTERNAL_SAME_HOST://localhost:29092
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL_SAME_HOST:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
+    depends_on:
+      - zookeeper
+    networks:
+      - node-network
+
+  init-kafka:
+    image: confluentinc/cp-kafka:6.1.1
+    container_name: init_kafka
+    depends_on:
+      - kafka
+    networks:
+      - node-network
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      kafka-topics --bootstrap-server kafka:9092 --list
+      
+      echo -e 'Creating kafka topics'
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic raw_data --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic processed_data --replication-factor 1 --partitions 1
+      # "--partitions", "10", "--replication-factor", "3"
+      
+      echo -e 'Successfully created the following topics:'
+      kafka-topics --bootstrap-server kafka:9092 --list
+      "
+
+  pyflink:
+    image: tosha/pyflink_image:latest
+    container_name: pyflink
+    restart: unless-stopped
+    networks:
+      - node-network
+    depends_on:
+      - data_generator
+    env_file:
+      - ${PWD}/.env
+      - ${PWD}/services/pyflink/.env
+    entrypoint: [ 'sleep', '10000s' ]
+
+  data_generator:
+    image: tosha/data_generator_image:latest
+    container_name: data_generator
+    restart: unless-stopped
+    networks:
+      - node-network
+    depends_on:
+      - kafka
+      - init-kafka
+    env_file:
+      - ${PWD}/.env
+      - ${PWD}/services/data_generator/.env
+    entrypoint: [ 'sleep', '10000s' ]
+
+volumes:
+  zookeeper_data:
+    driver: local
+  kafka_data:
+    driver: local
+
+networks:
+  node-network:
+    driver: bridge
