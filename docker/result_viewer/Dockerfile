@@ -5,7 +5,7 @@ RUN apk update && apk add curl nano gcc g++
 
 RUN mkdir work_dir
 WORKDIR /work_dir
-COPY services/data_generator .
+COPY services/result_viewer .
 COPY utils utils
 
 RUN addgroup -g 1000 user && adduser -h /home/user -u 1000 -G user -s /bin/sh -D user
@@ -20,4 +20,4 @@ USER user
 RUN pip install wheel setuptools pip --upgrade
 RUN pip install -r requirements.txt
 
-CMD [ "python", "./generator.py" ]
+CMD [ "python", "./viewer.py" ]

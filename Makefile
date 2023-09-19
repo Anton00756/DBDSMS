@@ -1,8 +1,8 @@
-image = data_generator
+image = result_viewer
 shared = true
 
 build:
-	docker build -t tosha/$(image)_image:latest -f docker/$(image)/Dockerfile services/$(image)
+	docker build -t tosha/$(image)_image:latest -f docker/$(image)/Dockerfile .
 
 up: down delete_trash
     ifeq ($(shared), true)
@@ -15,7 +15,17 @@ down:
 	docker-compose -p 1 down
 
 enter:
-	docker exec -it $(shell docker ps -aq -f "ancestor=tosha/$(image)_image") sh
+	docker exec -it $(image) sh
+
+logs:
+	@docker logs $(image)
+
+exec:
+    ifeq ($(image), 'pyflink')
+		@docker exec pyflink sh -c "python processor.py"
+    else
+		@docker exec data_generator sh -c "python generator.py"
+    endif
 
 delete_trash:
 	@docker volume prune -f

@@ -8,13 +8,16 @@ RUN ln -s /usr/bin/python3 /usr/bin/python
 
 RUN mkdir work_dir
 WORKDIR /work_dir
-COPY . .
+COPY services/pyflink .
+COPY utils utils
 
 RUN addgroup --gid 1000 user
 RUN adduser --home /home/user --uid 1000 --gid 1000 --shell /bin/sh --disabled-password user
 RUN addgroup --gid 1001 docker && addgroup user docker
 RUN chown -R user:user /var
 RUN chown -R user:user /work_dir
+
+RUN ln -sf /proc/1/fd/1 /var/log/container_logs.log
 
 USER user
 

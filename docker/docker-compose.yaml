@@ -67,23 +67,33 @@ services:
     depends_on:
       - data_generator
     env_file:
-      - ${PWD}/.env
       - ${PWD}/services/pyflink/.env
+      - ${PWD}/.env
     entrypoint: [ 'sleep', '10000s' ]
 
   data_generator:
     image: tosha/data_generator_image:latest
     container_name: data_generator
-    restart: unless-stopped
     networks:
       - node-network
     depends_on:
       - kafka
       - init-kafka
     env_file:
-      - ${PWD}/.env
       - ${PWD}/services/data_generator/.env
-    entrypoint: [ 'sleep', '10000s' ]
+      - ${PWD}/.env
+
+  result_viewer:
+    image: tosha/result_viewer_image:latest
+    container_name: result_viewer
+    networks:
+      - node-network
+    depends_on:
+      - kafka
+      - pyflink
+    env_file:
+      - ${PWD}/services/result_viewer/.env
+      - ${PWD}/.env
 
 volumes:
   zookeeper_data:

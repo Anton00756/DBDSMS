@@ -22,6 +22,7 @@ services:
       service: pyflink
     volumes:
       - ${PWD}/services/pyflink/.:/work_dir
+      - ${PWD}/utils:/work_dir/utils
 
   data_generator:
     extends:
@@ -29,6 +30,15 @@ services:
       service: data_generator
     volumes:
       - ${PWD}/services/data_generator/.:/work_dir
+      - ${PWD}/utils:/work_dir/utils
+
+  result_viewer:
+    extends:
+      file: docker-compose.yaml
+      service: result_viewer
+    volumes:
+      - ${PWD}/services/result_viewer/.:/work_dir
+      - ${PWD}/utils:/work_dir/utils
 
 volumes:
   zookeeper_data:
