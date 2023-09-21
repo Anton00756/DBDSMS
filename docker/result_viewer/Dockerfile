@@ -2,7 +2,7 @@ FROM python:3.10-alpine
 
 ENV TZ=Europe/Moscow
 ENV PYTHONPATH=/work_dir
-RUN apk update && apk add curl nano gcc g++
+RUN apk update && apk add curl nano gcc g++ libpq-dev
 
 RUN mkdir work_dir
 WORKDIR /work_dir

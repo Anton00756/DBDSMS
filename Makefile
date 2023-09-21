@@ -31,7 +31,10 @@ exec:
 		@docker exec data_generator sh -c "python service/generator.py"
     endif
     ifeq ($(image), result_viewer)
-		@docker exec data_generator sh -c "python service/viewer.py"
+		@docker exec result_viewer sh -c "python service/viewer.py"
+    endif
+    ifeq ($(image), gp)
+		@docker exec result_viewer sh -c "python service/greenplum.py"
     endif
 
 delete_trash:

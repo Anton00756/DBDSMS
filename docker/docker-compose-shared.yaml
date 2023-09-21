@@ -50,6 +50,8 @@ volumes:
     driver: local
   kafka_data:
     driver: local
+  greenplum_data:
+    driver: local
 
 networks:
   node-network:

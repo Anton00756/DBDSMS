@@ -16,10 +16,12 @@ if __name__ == '__main__':
                                      bootstrap_servers=[os.environ['KAFKA_ADDRESS']],
                                      auto_offset_reset='earliest',
                                      value_deserializer=lambda v: json.loads(v.decode('utf-8')))
+            LOGGER.info('Connection with Kafka has been established')
             for message in consumer:
                 LOGGER.info(f'Message: {message}')
         except errors.NoBrokersAvailable:
-            time.sleep(0.1)
+            time.sleep(0.2)
+            LOGGER.error('Could not connect to Kafka111')
     else:
         LOGGER.error('Could not connect to Kafka')
 

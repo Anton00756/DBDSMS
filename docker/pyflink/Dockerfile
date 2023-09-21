@@ -4,12 +4,15 @@ ENV TZ=Europe/Moscow
 ENV PYTHONPATH=/work_dir
 
 RUN apt-get update -y && \
-apt-get install -y curl nano gcc g++ python3 python3-pip python3-dev && rm -rf /var/lib/apt/lists/*
+apt-get install -y curl nano gcc g++ python3 python3-pip python3-dev libpq-dev && rm -rf /var/lib/apt/lists/*
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
 RUN mkdir work_dir
 WORKDIR /work_dir
 RUN wget -O flink-connector-kafka.jar https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-kafka/1.17.1/flink-sql-connector-kafka-1.17.1.jar
+#RUN wget -O flink-connector-jdbc.jar https://repo.maven.apache.org/maven2/org/apache/flink/flink-connector-jdbc_2.12/1.14.6/flink-connector-jdbc_2.12-1.14.6.jar
+#RUN wget -O flink-streaming-java.jar https://repo.maven.apache.org/maven2/org/apache/flink/flink-streaming-java_2.12/1.14.6/flink-streaming-java_2.12-1.14.6.jar
+#RUN wget -O postgres-connector-java.jar https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.6.0/postgresql-42.6.0.jar
 COPY services/pyflink service
 COPY utils utils
 
