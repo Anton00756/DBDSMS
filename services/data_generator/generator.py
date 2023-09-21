@@ -16,7 +16,7 @@ DATA_TO_SEND = [
 def generate_data():
     for i in range(1_000):
         yield {'number': i, 'string': f'test{i}'}
-    yield from DATA_TO_SEND
+    # yield from DATA_TO_SEND
 
 
 if __name__ == '__main__':
@@ -26,7 +26,6 @@ if __name__ == '__main__':
         try:
             producer = KafkaProducer(bootstrap_servers=os.environ['KAFKA_ADDRESS'],
                                      value_serializer=lambda v: json.dumps(v).encode('utf-8'))
-            LOGGER.info(str(producer.config))
             [producer.send('raw_data', value) for value in generate_data()]
             producer.flush()
             producer.close()
@@ -34,6 +33,5 @@ if __name__ == '__main__':
             exit(0)
         except errors.NoBrokersAvailable:
             time.sleep(0.2)
-            LOGGER.error('Could not connect to Kafka111')
     else:
         LOGGER.error('Could not connect to Kafka')

@@ -16,12 +16,13 @@ up: down delete_trash
     else
 		docker-compose -f=docker/docker-compose.yaml -p 1 up -d
     endif
+	@docker exec pyflink /opt/flink/bin/flink run -py /work_dir/service/processor.py
 
 down:
 	docker-compose -p 1 down
 
 enter:
-	docker exec -it $(image) sh
+	@docker exec -it $(image) sh
 
 exec:
     ifeq ($(image), pyflink)

@@ -10,9 +10,8 @@ RUN ln -s /usr/bin/python3 /usr/bin/python
 RUN mkdir work_dir
 WORKDIR /work_dir
 RUN wget -O flink-connector-kafka.jar https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-kafka/1.17.1/flink-sql-connector-kafka-1.17.1.jar
-#RUN wget -O flink-connector-jdbc.jar https://repo.maven.apache.org/maven2/org/apache/flink/flink-connector-jdbc_2.12/1.14.6/flink-connector-jdbc_2.12-1.14.6.jar
-#RUN wget -O flink-streaming-java.jar https://repo.maven.apache.org/maven2/org/apache/flink/flink-streaming-java_2.12/1.14.6/flink-streaming-java_2.12-1.14.6.jar
-#RUN wget -O postgres-connector-java.jar https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.6.0/postgresql-42.6.0.jar
+RUN wget -O flink-connector-jdbc.jar https://repo.maven.apache.org/maven2/org/apache/flink/flink-connector-jdbc/3.1.1-1.17/flink-connector-jdbc-3.1.1-1.17.jar
+RUN wget -O postgres-connector-java.jar https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.6.0/postgresql-42.6.0.jar
 COPY services/pyflink service
 COPY utils utils
 
@@ -30,4 +29,4 @@ USER user
 RUN pip install wheel setuptools pip --upgrade
 RUN pip install -r service/requirements.txt
 
-CMD [ "python", "service/processor.py" ]
+#CMD [ "python", "service/processor.py" ]

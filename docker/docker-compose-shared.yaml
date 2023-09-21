@@ -21,6 +21,14 @@ services:
       file: docker-compose.yaml
       service: greenplum
 
+  taskmanager:
+    extends:
+      file: docker-compose.yaml
+      service: taskmanager
+    volumes:
+      - ${PWD}/services/pyflink:/work_dir/service
+      - ${PWD}/utils:/work_dir/utils
+
   pyflink:
     extends:
       file: docker-compose.yaml

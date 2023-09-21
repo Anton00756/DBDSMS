@@ -51,9 +51,8 @@ services:
       kafka-topics --bootstrap-server kafka:9092 --list
       
       echo -e 'Creating kafka topics'
-      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic raw_data --replication-factor 10 --partitions 1
-      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic processed_data --replication-factor 10 --partitions 1
-      # "--partitions", "10", "--replication-factor", "3"
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic raw_data --replication-factor 3 --partitions 10
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic processed_data --replication-factor 3 --partitions 10
       
       echo -e 'Successfully created the following topics:'
       kafka-topics --bootstrap-server kafka:9092 --list
@@ -75,6 +74,22 @@ services:
     env_file:
       - ${PWD}/.env
 
+  taskmanager:
+    image: tosha/pyflink_image:latest
+    depends_on:
+      - pyflink
+    command: taskmanager
+    networks:
+      - node-network
+    env_file:
+      - ${PWD}/services/pyflink/.env
+      - ${PWD}/.env
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: pyflink
+        taskmanager.numberOfTaskSlots: 2   
+
   pyflink:
     image: tosha/pyflink_image:latest
     container_name: pyflink
@@ -87,7 +102,12 @@ services:
     env_file:
       - ${PWD}/services/pyflink/.env
       - ${PWD}/.env
-#    entrypoint: [ 'sleep', '10000s' ]
+    command: jobmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: pyflink
+  #    entrypoint: [ 'sleep', '10000s' ]
 
   data_generator:
     image: tosha/data_generator_image:latest

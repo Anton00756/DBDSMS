@@ -21,7 +21,6 @@ if __name__ == '__main__':
                 LOGGER.info(f'Message: {message}')
         except errors.NoBrokersAvailable:
             time.sleep(0.2)
-            LOGGER.error('Could not connect to Kafka111')
     else:
         LOGGER.error('Could not connect to Kafka')
 
