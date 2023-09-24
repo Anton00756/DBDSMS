@@ -4,7 +4,7 @@ import time
 
 from kafka import KafkaConsumer, errors
 
-import utils.helper as helper
+from utils import helper
 
 
 if __name__ == '__main__':

@@ -6,35 +6,15 @@ from pyflink.common import Time
 from pyflink.common.typeinfo import Types
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.datastream.checkpointing_mode import CheckpointingMode
-from pyflink.datastream.connectors import FlinkKafkaConsumer, FlinkKafkaProducer, JdbcSink, JdbcConnectionOptions
+from pyflink.datastream.connectors import FlinkKafkaConsumer, FlinkKafkaProducer, JdbcSink, JdbcConnectionOptions, \
+    FileSink
+from pyflink.datastream.connectors.file_system import RollingPolicy, OutputFileConfig
 from pyflink.datastream.formats.json import JsonRowDeserializationSchema, JsonRowSerializationSchema
-from pyflink.datastream.functions import RuntimeContext, FlatMapFunction
-from pyflink.datastream.state import ValueStateDescriptor, StateTtlConfig
 
-import utils.helper as helper
+from utils import helper
+from utils.flink import JsonEncoder, KeyBucketAssigner, Deduplicator, UpdateEnrichment, AddEnrichment
 
 LOGGER = helper.get_logger()
-
-
-class Deduplicator(FlatMapFunction):
-    def __init__(self, time_to_live: Time):
-        self.ttl = time_to_live
-        self.key_was_seen = None
-
-    def open(self, runtime_context: RuntimeContext):
-        state_descriptor = ValueStateDescriptor("key_was_seen", Types.BOOLEAN())
-        state_ttl_config = StateTtlConfig \
-            .new_builder(self.ttl) \
-            .set_update_type(StateTtlConfig.UpdateType.OnReadAndWrite) \
-            .disable_cleanup_in_background() \
-            .build()
-        state_descriptor.enable_time_to_live(state_ttl_config)
-        self.key_was_seen = runtime_context.get_state(state_descriptor)
-
-    def flat_map(self, value):
-        if self.key_was_seen.value() is None:
-            self.key_was_seen.update(True)
-            yield value
 
 
 def init_greenplum_table(host: str, port: str, dbname: str, user: str, password: str, sql: str):
@@ -56,8 +36,8 @@ def init_greenplum_table(host: str, port: str, dbname: str, user: str, password:
 def get_prepared_flink_env():
     environment = StreamExecutionEnvironment.get_execution_environment()
     [environment.add_jars(f"file:///{jar}") for jar in os.environ['JAR_FILES'].split(';')]
-    environment.enable_checkpointing(60000, CheckpointingMode.EXACTLY_ONCE)
-    environment.get_checkpoint_config().set_min_pause_between_checkpoints(120000)
+    environment.enable_checkpointing(30000, CheckpointingMode.EXACTLY_ONCE)
+    environment.get_checkpoint_config().set_min_pause_between_checkpoints(60000)
     environment.get_checkpoint_config().enable_unaligned_checkpoints()
     environment.get_checkpoint_config().set_checkpoint_interval(30000)
     return environment
@@ -72,13 +52,15 @@ if __name__ == '__main__':
 
     type_info = Types.ROW_NAMED(['number', 'string'],
                                 [Types.INT(), Types.STRING()])
+    out_type_info = Types.ROW_NAMED(['number', 'string', 'string2'],
+                                    [Types.INT(), Types.STRING(), Types.STRING()])
     in_json_schema = JsonRowDeserializationSchema.builder().type_info(type_info).build()
-    out_json_schema = JsonRowSerializationSchema.builder().with_type_info(type_info).build()
+    out_json_schema = JsonRowSerializationSchema.builder().with_type_info(out_type_info).build()
 
     kafka_consumer = FlinkKafkaConsumer(
         'raw_data',
         deserialization_schema=in_json_schema,
-        properties={"bootstrap.servers": os.environ['KAFKA_ADDRESS']}
+        properties={"bootstrap.servers": os.environ['KAFKA_ADDRESS'], "group.id": "pyflink"}
     )
     kafka_consumer.set_start_from_earliest()
     data_stream = env.add_source(kafka_consumer)
@@ -95,12 +77,19 @@ if __name__ == '__main__':
         .with_password(os.environ['GP_PASSWORD']) \
         .with_driver_name("org.postgresql.Driver") \
         .build()
-    greenplum_producer = JdbcSink.sink("insert into results(number, message) VALUES(?, ?)",
-                                       type_info=Types.ROW([Types.INT(), Types.STRING()]),
-                                       jdbc_connection_options=greenplum_options)
+    greenplum_producer = JdbcSink.sink("insert into results(number, message, add_message) VALUES(?, ?, ?)",
+                                       type_info=out_type_info, jdbc_connection_options=greenplum_options)
 
-    processed_data_stream = data_stream.key_by(lambda x: x.number) \
-        .flat_map(Deduplicator(Time.minutes(10)), output_type=type_info)
+    minio_producer = FileSink.for_row_format(base_path=f"s3://{os.environ['RESULT_BUCKET']}/", encoder=JsonEncoder()) \
+        .with_bucket_assigner(KeyBucketAssigner('number')) \
+        .with_output_file_config(OutputFileConfig.builder().with_part_suffix('.json').build()) \
+        .with_rolling_policy(RollingPolicy.default_rolling_policy(1)).build()
+
+    processed_data_stream = data_stream.key_by(lambda x: x['number']) \
+        .flat_map(Deduplicator(Time.minutes(10)), output_type=type_info) \
+        .map(UpdateEnrichment(os.environ['REDIS_HOST'], int(os.environ['REDIS_PORT'])), output_type=type_info) \
+        .map(AddEnrichment(os.environ['REDIS_HOST'], int(os.environ['REDIS_PORT'])), output_type=out_type_info)
     processed_data_stream.add_sink(kafka_producer)
-    processed_data_stream.add_sink(greenplum_producer)
+    # processed_data_stream.add_sink(greenplum_producer)
+    processed_data_stream.sink_to(minio_producer)
     env.execute()

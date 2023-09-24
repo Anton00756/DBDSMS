@@ -4,7 +4,8 @@ import time
 
 from kafka import KafkaProducer, errors
 
-import utils.helper as helper
+from redis import Redis
+from utils import helper
 
 DATA_TO_SEND = [
     {'number': 1, 'string': 'test'},
@@ -16,11 +17,17 @@ DATA_TO_SEND = [
 def generate_data():
     for i in range(1_000):
         yield {'number': i, 'string': f'test{i}'}
-    # yield from DATA_TO_SEND
 
 
 if __name__ == '__main__':
     LOGGER = helper.get_logger()
+
+    LOGGER.info('Waiting Redis-container...')
+    with Redis(os.environ['REDIS_HOST'], int(os.environ['REDIS_PORT'])) as redis_conn:
+        for i in range(1_000):
+            redis_conn.set(f'test{i}', f'{i}test')
+    LOGGER.info('Data was generated and sent to Redis')
+
     LOGGER.info('Waiting Kafka-container...')
     for _ in range(100):
         try:

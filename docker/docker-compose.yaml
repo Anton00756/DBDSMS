@@ -6,9 +6,9 @@ services:
     container_name: zookeeper
     restart: unless-stopped
     ports:
-      - "2181:2181"
+      - "2181"
     volumes:
-      - "zookeeper_data:/bitnami"
+      - zookeeper_data:/bitnami
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
     networks:
@@ -21,7 +21,7 @@ services:
     ports:
       - "9092:9092"
     volumes:
-      - "kafka_data:/bitnami"
+      - kafka_data:/bitnami
     environment:
       - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
       - ALLOW_PLAINTEXT_LISTENER=yes
@@ -74,6 +74,48 @@ services:
     env_file:
       - ${PWD}/.env
 
+  minio:
+    image: quay.io/minio/minio
+    container_name: minio
+    command: server /data --console-address minio-server:9090
+    hostname: minio-server
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9090:9090"
+    volumes:
+      - minio_data:/data
+    env_file:
+      - ${PWD}/.env
+    networks:
+      - node-network
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - node-network
+    volumes:
+      - redis_data:/data
+
+  create_minio_buckets:
+    image: minio/mc
+    container_name: create_minio_buckets
+    depends_on:
+      - minio
+    networks:
+      - node-network
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio-server:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
+      /usr/bin/mc mb myminio/results;
+      /usr/bin/mc anonymous set public myminio/results;
+      exit 0;
+      "
+
   taskmanager:
     image: tosha/pyflink_image:latest
     depends_on:
@@ -88,7 +130,13 @@ services:
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: pyflink
-        taskmanager.numberOfTaskSlots: 2   
+        taskmanager.numberOfTaskSlots: ${TASK_MANAGER_SLOT_COUNT}
+        s3.endpoint: http://minio-server:9000
+        s3.path-style-access: true
+        s3.access-key: ${MINIO_ROOT_USER} 
+        s3.secret-key: ${MINIO_ROOT_PASSWORD}
+        state.backend: filesystem
+        s3.connection.maximum: 100
 
   pyflink:
     image: tosha/pyflink_image:latest
@@ -99,6 +147,8 @@ services:
       - init-kafka
       - data_generator
       - greenplum
+      - create_minio_buckets
+      - redis
     env_file:
       - ${PWD}/services/pyflink/.env
       - ${PWD}/.env
@@ -107,6 +157,12 @@ services:
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: pyflink
+        s3.endpoint: http://minio-server:9000
+        s3.path-style-access: true
+        s3.access-key: ${MINIO_ROOT_USER} 
+        s3.secret-key: ${MINIO_ROOT_PASSWORD}
+        state.backend: filesystem
+        s3.connection.maximum: 100
   #    entrypoint: [ 'sleep', '10000s' ]
 
   data_generator:
@@ -116,6 +172,7 @@ services:
       - node-network
     depends_on:
       - init-kafka
+      - redis
     env_file:
       - ${PWD}/services/data_generator/.env
       - ${PWD}/.env
@@ -138,6 +195,10 @@ volumes:
   kafka_data:
     driver: local
   greenplum_data:
+    driver: local
+  minio_data:
+    driver: local
+  redis_data:
     driver: local
 
 networks:

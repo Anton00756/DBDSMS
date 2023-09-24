@@ -10,6 +10,8 @@ RUN ln -s /usr/bin/python3 /usr/bin/python
 RUN mkdir work_dir
 WORKDIR /work_dir
 RUN wget -O flink-connector-kafka.jar https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-kafka/1.17.1/flink-sql-connector-kafka-1.17.1.jar
+RUN mkdir -p /opt/flink/plugins/s3
+RUN wget -O /opt/flink/plugins/s3/flink-s3-hadoop.jar https://repo.maven.apache.org/maven2/org/apache/flink/flink-s3-fs-hadoop/1.17.1/flink-s3-fs-hadoop-1.17.1.jar
 RUN wget -O flink-connector-jdbc.jar https://repo.maven.apache.org/maven2/org/apache/flink/flink-connector-jdbc/3.1.1-1.17/flink-connector-jdbc-3.1.1-1.17.jar
 RUN wget -O postgres-connector-java.jar https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.6.0/postgresql-42.6.0.jar
 COPY services/pyflink service

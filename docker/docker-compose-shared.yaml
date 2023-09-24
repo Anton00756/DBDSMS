@@ -21,6 +21,21 @@ services:
       file: docker-compose.yaml
       service: greenplum
 
+  minio:
+    extends:
+      file: docker-compose.yaml
+      service: minio
+
+  redis:
+    extends:
+      file: docker-compose.yaml
+      service: redis
+
+  create_minio_buckets:
+    extends:
+      file: docker-compose.yaml
+      service: create_minio_buckets
+
   taskmanager:
     extends:
       file: docker-compose.yaml
@@ -59,6 +74,10 @@ volumes:
   kafka_data:
     driver: local
   greenplum_data:
+    driver: local
+  minio_data:
+    driver: local
+  redis_data:
     driver: local
 
 networks:

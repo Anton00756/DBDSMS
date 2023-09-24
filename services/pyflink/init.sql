@@ -1,1 +1,1 @@
-create table if not exists results (number bigint not null, message text)
+create table if not exists results (number bigint not null, message text, add_message text)

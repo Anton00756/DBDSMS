@@ -2,9 +2,10 @@ IMAGE_LIST = data_generator pyflink result_viewer
 
 image = result_viewer
 shared = true
+only_up = false
 
 build:
-	docker build -t tosha/$(image)_image:latest -f docker/$(image)/Dockerfile .
+	@docker build -t tosha/$(image)_image:latest -f docker/$(image)/Dockerfile .
 
 full_build:
 	@$(foreach image_name, $(IMAGE_LIST), \
@@ -12,14 +13,19 @@ full_build:
 
 up: down delete_trash
     ifeq ($(shared), true)
-		docker-compose -f=docker/docker-compose-shared.yaml -p 1 up -d
+		@docker-compose --env-file .env -f=docker/docker-compose-shared.yaml -p cdaps up -d
     else
-		docker-compose -f=docker/docker-compose.yaml -p 1 up -d
+		@docker-compose --env-file .env -f=docker/docker-compose.yaml -p cdaps up -d
     endif
+    ifeq ($(only_up), false)
+		@docker exec pyflink /opt/flink/bin/flink run -py /work_dir/service/processor.py
+    endif
+
+run:
 	@docker exec pyflink /opt/flink/bin/flink run -py /work_dir/service/processor.py
 
 down:
-	docker-compose -p 1 down
+	@docker-compose -p cdaps down
 
 enter:
 	@docker exec -it $(image) sh
@@ -39,5 +45,5 @@ exec:
     endif
 
 delete_trash:
-	@docker volume prune -f
+	@docker volume prune -af
 	@docker system prune -f
