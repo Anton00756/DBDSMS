@@ -59,7 +59,7 @@ services:
       "
 
   greenplum:
-    image: ionxwood/greenplum:latest
+    image: ionxwood/greenplum:6.21.0
     container_name: greenplum
     restart: unless-stopped
     ports:
@@ -68,21 +68,28 @@ services:
       - node-network
     volumes:
       - greenplum_data:/srv
+      - ${PWD}/services/greenplum/init.sql:/init.sql
     environment:
       MALLOC_ARENA_MAX: 1
       TZ: Europe/Moscow
+      PGPASSWORD: ${GP_PASSWORD}
     env_file:
       - ${PWD}/.env
+    healthcheck:
+      test: "/usr/local/greenplum-db-6.21.0/bin/pg_isready &&
+        /usr/local/greenplum-db-6.21.0/bin/psql -h ${GP_HOST} -U ${GP_USER} -d ${GP_DB} -f /init.sql"
+      interval: 1s
+      timeout: 3s
+      retries: 100
 
   minio:
-    image: quay.io/minio/minio
+    image: quay.io/minio/minio:RELEASE.2023-09-23T03-47-50Z
     container_name: minio
-    command: server /data --console-address minio-server:9090
-    hostname: minio-server
+    command: server /data --address :9000 --console-address :9001
     restart: unless-stopped
     ports:
       - "9000:9000"
-      - "9090:9090"
+      - "9001:9001"
     volumes:
       - minio_data:/data
     env_file:
@@ -91,7 +98,7 @@ services:
       - node-network
 
   redis:
-    image: redis:latest
+    image: redis:7.2.1
     container_name: redis
     restart: unless-stopped
     ports:
@@ -102,7 +109,7 @@ services:
       - redis_data:/data
 
   create_minio_buckets:
-    image: minio/mc
+    image: minio/mc:RELEASE.2023-09-22T05-07-46Z
     container_name: create_minio_buckets
     depends_on:
       - minio
@@ -110,11 +117,41 @@ services:
       - node-network
     entrypoint: >
       /bin/sh -c "
-      /usr/bin/mc alias set myminio http://minio-server:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
+      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
       /usr/bin/mc mb myminio/results;
       /usr/bin/mc anonymous set public myminio/results;
       exit 0;
       "
+
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ${PWD}/services/prometheus/config.yml:/etc/prometheus/config.yml
+      - prometheus_data:/prometheus
+    command: --config.file=/etc/prometheus/config.yml
+    ports:
+      - "9090:9090"
+    environment:
+      TZ: "Europe/Moscow"
+    networks:
+      - node-network
+
+  grafana:
+    image: grafana/grafana:10.1.2
+    container_name: grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      TZ: "Europe/Moscow"
+    networks:
+      - node-network
 
   taskmanager:
     image: tosha/pyflink_image:latest
@@ -131,12 +168,15 @@ services:
         FLINK_PROPERTIES=
         jobmanager.rpc.address: pyflink
         taskmanager.numberOfTaskSlots: ${TASK_MANAGER_SLOT_COUNT}
-        s3.endpoint: http://minio-server:9000
+        s3.endpoint: http://minio:9000
         s3.path-style-access: true
         s3.access-key: ${MINIO_ROOT_USER} 
         s3.secret-key: ${MINIO_ROOT_PASSWORD}
         state.backend: filesystem
         s3.connection.maximum: 100
+        metrics.reporters: prom
+        metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+        metrics.reporter.prom.port: 9999
 
   pyflink:
     image: tosha/pyflink_image:latest
@@ -144,11 +184,18 @@ services:
     networks:
       - node-network
     depends_on:
-      - init-kafka
-      - data_generator
-      - greenplum
-      - create_minio_buckets
-      - redis
+      init-kafka:
+        condition: service_completed_successfully
+      greenplum:
+        condition: service_healthy
+      create_minio_buckets:
+        condition: service_started
+      redis:
+        condition: service_started
+      prometheus:
+        condition: service_started
+      data_generator:
+        condition: service_started
     env_file:
       - ${PWD}/services/pyflink/.env
       - ${PWD}/.env
@@ -157,12 +204,15 @@ services:
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: pyflink
-        s3.endpoint: http://minio-server:9000
+        s3.endpoint: http://minio:9000
         s3.path-style-access: true
         s3.access-key: ${MINIO_ROOT_USER} 
         s3.secret-key: ${MINIO_ROOT_PASSWORD}
         state.backend: filesystem
         s3.connection.maximum: 100
+        metrics.reporters: prom
+        metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporter
+        metrics.reporter.prom.port: 9999
   #    entrypoint: [ 'sleep', '10000s' ]
 
   data_generator:
@@ -199,6 +249,10 @@ volumes:
   minio_data:
     driver: local
   redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local
 
 networks:

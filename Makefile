@@ -45,5 +45,5 @@ exec:
     endif
 
 delete_trash:
-	@docker volume prune -af
+	@docker volume rm -f $(shell docker volume ls -q | grep -v "grafana") || true
 	@docker system prune -f

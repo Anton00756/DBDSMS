@@ -1,7 +1,5 @@
 import os
-import time
 
-import psycopg2
 from pyflink.common import Time
 from pyflink.common.typeinfo import Types
 from pyflink.datastream import StreamExecutionEnvironment
@@ -17,22 +15,6 @@ from utils.flink import JsonEncoder, KeyBucketAssigner, Deduplicator, UpdateEnri
 LOGGER = helper.get_logger()
 
 
-def init_greenplum_table(host: str, port: str, dbname: str, user: str, password: str, sql: str):
-    LOGGER.info('Waiting Greenplum-container...')
-    for _ in range(100):
-        try:
-            with psycopg2.connect(host=host, port=port, dbname=dbname, user=user, password=password) as conn:
-                with conn.cursor() as cur:
-                    cur.execute(sql)
-                    LOGGER.info('Result table in Greenplum was created')
-            break
-        except psycopg2.OperationalError:
-            time.sleep(0.5)
-    else:
-        LOGGER.error('Could not connect to Greenplum')
-        exit(0)
-
-
 def get_prepared_flink_env():
     environment = StreamExecutionEnvironment.get_execution_environment()
     [environment.add_jars(f"file:///{jar}") for jar in os.environ['JAR_FILES'].split(';')]
@@ -44,10 +26,6 @@ def get_prepared_flink_env():
 
 
 if __name__ == '__main__':
-    with open(os.environ['INIT_SQL_PATH'], 'r') as f:
-        init_greenplum_table(host=os.environ['GP_HOST'], port=os.environ['GP_PORT'], dbname=os.environ['GP_DB'],
-                             user=os.environ['GP_USER'], password=os.environ['GP_PASSWORD'], sql=f.read())
-
     env = get_prepared_flink_env()
 
     type_info = Types.ROW_NAMED(['number', 'string'],
@@ -90,6 +68,6 @@ if __name__ == '__main__':
         .map(UpdateEnrichment(os.environ['REDIS_HOST'], int(os.environ['REDIS_PORT'])), output_type=type_info) \
         .map(AddEnrichment(os.environ['REDIS_HOST'], int(os.environ['REDIS_PORT'])), output_type=out_type_info)
     processed_data_stream.add_sink(kafka_producer)
-    # processed_data_stream.add_sink(greenplum_producer)
+    processed_data_stream.add_sink(greenplum_producer)
     processed_data_stream.sink_to(minio_producer)
     env.execute()

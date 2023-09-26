@@ -14,6 +14,8 @@ class Deduplicator(FlatMapFunction):
     def __init__(self, time_to_live: Time):
         self.ttl = time_to_live
         self.key_was_seen = None
+        self.counter_in = None
+        self.counter_out = None
 
     def open(self, runtime_context: RuntimeContext):
         state_descriptor = ValueStateDescriptor("key_was_seen", Types.BOOLEAN())
@@ -24,10 +26,14 @@ class Deduplicator(FlatMapFunction):
             .build()
         state_descriptor.enable_time_to_live(state_ttl_config)
         self.key_was_seen = runtime_context.get_state(state_descriptor)
+        self.counter_in = runtime_context.get_metrics_group().counter("deduplicator_in")
+        self.counter_out = runtime_context.get_metrics_group().counter("deduplicator_out")
 
     def flat_map(self, value):
+        self.counter_in.inc()
         if self.key_was_seen.value() is None:
             self.key_was_seen.update(True)
+            self.counter_out.inc()
             yield value
 
 

@@ -1,4 +1,4 @@
-FROM flink:latest
+FROM flink:1.17.1-java11
 
 ENV TZ=Europe/Moscow
 ENV PYTHONPATH=/work_dir
@@ -30,5 +30,3 @@ USER user
 
 RUN pip install wheel setuptools pip --upgrade
 RUN pip install -r service/requirements.txt
-
-#CMD [ "python", "service/processor.py" ]

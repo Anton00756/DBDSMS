@@ -36,6 +36,16 @@ services:
       file: docker-compose.yaml
       service: create_minio_buckets
 
+  prometheus:
+    extends:
+      file: docker-compose.yaml
+      service: prometheus
+
+  grafana:
+    extends:
+      file: docker-compose.yaml
+      service: grafana
+
   taskmanager:
     extends:
       file: docker-compose.yaml
@@ -78,6 +88,10 @@ volumes:
   minio_data:
     driver: local
   redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local
 
 networks:
