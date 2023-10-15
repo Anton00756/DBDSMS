@@ -215,6 +215,22 @@ services:
         metrics.reporter.prom.port: 9999
   #    entrypoint: [ 'sleep', '10000s' ]
 
+  orchestrator:
+    image: tosha/orchestrator_image:latest
+    container_name: orchestrator
+    restart: unless-stopped
+    networks:
+      - node-network
+    ports:
+      - "5000:5000"
+    depends_on:
+      - pyflink
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    env_file:
+      - ${PWD}/services/orchestrator/.env
+      - ${PWD}/.env
+
   data_generator:
     image: tosha/data_generator_image:latest
     container_name: data_generator

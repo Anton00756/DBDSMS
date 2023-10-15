@@ -1,7 +1,7 @@
 from pyflink.common import Time
-from pyflink.common.typeinfo import Types
+from pyflink.common.typeinfo import Types, TypeInformation, RowTypeInfo
 from pyflink.common.types import Row
-from pyflink.datastream.functions import RuntimeContext, FlatMapFunction, MapFunction
+from pyflink.datastream.functions import RuntimeContext, FlatMapFunction, MapFunction, CoFlatMapFunction
 from pyflink.datastream.state import ValueStateDescriptor, StateTtlConfig
 from redis import Redis
 
@@ -74,3 +74,44 @@ class AddEnrichment(MapFunction):
 
     def close(self):
         self.conn.close()
+
+
+class StreamJoiner(CoFlatMapFunction):
+    def __init__(self, time_to_live: Time, first_template: tuple, second_template: tuple):
+        self.ttl = time_to_live
+        self.first_template = Types.ROW_NAMED(*first_template)
+        self.second_template = Types.ROW_NAMED(*second_template)
+        self.first_stream_value = None
+        self.second_stream_value = None
+
+    def open(self, runtime_context: RuntimeContext):
+        state_ttl_config = StateTtlConfig \
+            .new_builder(self.ttl) \
+            .set_update_type(StateTtlConfig.UpdateType.OnReadAndWrite) \
+            .disable_cleanup_in_background() \
+            .build()
+
+        first_state_descriptor = ValueStateDescriptor("first_stream", self.first_template)
+        first_state_descriptor.enable_time_to_live(state_ttl_config)
+        self.first_stream_value = runtime_context.get_state(first_state_descriptor)
+        second_state_descriptor = ValueStateDescriptor("second_stream", self.second_template)
+        second_state_descriptor.enable_time_to_live(state_ttl_config)
+        self.second_stream_value = runtime_context.get_state(second_state_descriptor)
+
+    def flat_map1(self, value):
+        if self.second_stream_value.value() is None:
+            self.first_stream_value.update(value)
+        else:
+            buffer_value = self.second_stream_value.value()
+            self.second_stream_value.clear()
+            row_generator = Row("number", "string", "string2")
+            yield row_generator(value['number'], value['string'], buffer_value['reversed_string'])
+
+    def flat_map2(self, value):
+        if self.first_stream_value.value() is None:
+            self.second_stream_value.update(value)
+        else:
+            buffer_value = self.first_stream_value.value()
+            self.first_stream_value.clear()
+            row_generator = Row("number", "string", "string2")
+            yield row_generator(value['number'], buffer_value['string'], value['reversed_string'])

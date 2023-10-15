@@ -15,8 +15,19 @@ DATA_TO_SEND = [
 
 
 def generate_data():
-    for i in range(1_000):
+    # i = 1
+    # return {'number': i, 'string': f'test{i}'}
+    for i in range(10_000):
         yield {'number': i, 'string': f'test{i}'}
+
+
+def generate_reversed_data():
+    # i = 1
+    # return {'number': i, 'reversed_string': f'{i}tset'}
+    # for i in range(1_000, 2_000):
+    #     yield {'number': i, 'reversed_string': f'{i}tset'}
+    for i in range(1_000):
+        yield {'number': i, 'reversed_string': f'{i}tset'}
 
 
 if __name__ == '__main__':
@@ -34,6 +45,7 @@ if __name__ == '__main__':
             producer = KafkaProducer(bootstrap_servers=os.environ['KAFKA_ADDRESS'],
                                      value_serializer=lambda v: json.dumps(v).encode('utf-8'))
             [producer.send('raw_data', value) for value in generate_data()]
+            [producer.send('second_raw_data', value) for value in generate_reversed_data()]
             producer.flush()
             producer.close()
             LOGGER.info('Data was generated and sent to Kafka')

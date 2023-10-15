@@ -62,6 +62,14 @@ services:
       - ${PWD}/services/pyflink:/work_dir/service
       - ${PWD}/utils:/work_dir/utils
 
+  orchestrator:
+    extends:
+      file: docker-compose.yaml
+      service: orchestrator
+    volumes:
+      - ${PWD}/services/orchestrator:/work_dir/service
+      - ${PWD}/utils:/work_dir/utils
+
   data_generator:
     extends:
       file: docker-compose.yaml
