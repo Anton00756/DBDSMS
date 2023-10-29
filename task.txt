@@ -2,6 +2,7 @@
 Cluster data analysis and processing system
 [CDAPS by AE]
 
+job by json / yaml
 Метрики внутри операторов
 
 Контейнер-оркестратор:

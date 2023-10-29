@@ -31,9 +31,6 @@ enter:
 	@docker exec -it $(image) sh
 
 exec:
-    ifeq ($(image), pyflink)
-		@docker exec pyflink sh -c "python service/processor.py"
-    endif
     ifeq ($(image), data_generator)
 		@docker exec data_generator sh -c "python service/generator.py"
     endif
