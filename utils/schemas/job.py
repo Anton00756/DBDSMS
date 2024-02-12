@@ -1,7 +1,6 @@
 from marshmallow import Schema, fields, post_load
 from utils.entities import Settings, Job
 from .sources import SourceSchema
-from .sinks import KafkaSinkSchema, GreenplumSinkSchema, MinioSinkSchema
 from .json_field import JSON
 
 
@@ -23,15 +22,11 @@ class JobSettingsSchema(Schema):
 class JobSchema(Schema):
     settings = fields.Nested(JobSettingsSchema, required=False, description="Настройки выполнения задания",
                              allow_none=True)
-    sources = fields.Dict(keys=fields.Str(), values=fields.Nested(SourceSchema), required=True,
+    sources = fields.Dict(keys=fields.Str(), values=JSON(), required=True,
                           description="Входные хранилища")
     sinks = fields.Dict(keys=fields.Str(), values=JSON(), required=True, description="Выходные хранилища")
-    # operators = fields.Dict(keys=fields.Str(), values=fields.Nested(SourceSchema), required=True,
-    #                         description="Операторы")
-
-    @post_load
-    def make_object(self, data, **kwargs):
-        return Job(data)
+    operators = fields.Dict(keys=fields.Str(), values=fields.List(JSON()), required=True,
+                            description="Операторы")
 
 
 class ErrorSchema(Schema):

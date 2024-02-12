@@ -9,7 +9,7 @@ class JSON(marshmallow.fields.Field):
         self.fields = fields_to_delete if fields_to_delete else []
 
     def _serialize(self, value: Any, attr: str, obj: str, **kwargs):
-        result = value.__dict__
+        result = value if type(value) is dict else value.__dict__
         for field in self.fields:
             if field in result:
                 del result[field]

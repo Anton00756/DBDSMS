@@ -80,6 +80,7 @@ if __name__ == '__main__':
                                                  (Types.INT(), Types.STRING())), (('number', 'reversed_string'),
                                                                                   (Types.INT(), Types.STRING()))),
                   output_type=out_type_info).print()
+    # data_stream.filter(lambda x: x['string'] == x['reversed_string']).print()
     # processed_data_stream = first.connect(second).key_by(lambda x: x['number'], lambda x: x['number'])\
     #     .process(StreamJoiner(Time.minutes(1), type_info, type_info), output_type=out_type_info)
     # processed_data_stream.print()

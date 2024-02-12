@@ -1,3 +1,3 @@
 /venv/
 /.idea
-/services/orchestrator/config.json
+/services/orchestrator/config*.json

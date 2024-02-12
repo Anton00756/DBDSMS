@@ -1,18 +1,21 @@
 import json
 
 from marshmallow import Schema, fields, post_load
-from utils.entities import Source
+
+from utils.entities import KafkaSource, SchemaFieldType
 
 
 class SourceSchema(Schema):
     address = fields.Str(description="Адрес", required=True, example='kafka:9092')
     topic = fields.Str(description="Название топика", required=True, example='data_with_numbers')
-    schema = fields.Dict(keys=fields.Str(), values=fields.Str(), description="JSON-схема [Поле - тип]", required=True,
-                         example=json.dumps({'number': 'int', 'string': 'string', 'string2': 'string'}, indent=4))
+    schema = fields.Dict(keys=fields.Str(), values=fields.Str(), description="JSON-схема [Поле - тип]",
+                         required=True, example=json.dumps({'number': SchemaFieldType.INT.value,
+                                                            'string': SchemaFieldType.STRING.value,
+                                                            'string2': SchemaFieldType.STRING.value}, indent=4))
 
     @post_load
     def make_object(self, data, **kwargs):
-        return Source(**data)
+        return KafkaSource(**data)
 
 
 class PostSourceSchema(SourceSchema):
@@ -21,4 +24,4 @@ class PostSourceSchema(SourceSchema):
     @post_load
     def make_object(self, data, **kwargs):
         name = data.pop('name')
-        return name, Source(**data)
+        return name, KafkaSource(**data)

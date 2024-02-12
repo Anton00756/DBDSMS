@@ -1,7 +1,7 @@
-import copy
 import json
 
-from marshmallow import Schema, fields, post_load, pre_dump
+from marshmallow import Schema, fields, post_load
+
 from utils.entities import GreenplumSink, KafkaSink, MinioSink, SinkType
 
 
@@ -15,7 +15,7 @@ class KafkaSinkSchema(Schema):
 
 
 class PostKafkaSinkSchema(KafkaSinkSchema):
-    name = fields.Str(description="Уникальное название", required=True, example='data_with_numbers')
+    name = fields.Str(description="Уникальное название", required=True, example='kafka_sink')
 
     @post_load
     def make_object(self, data, **kwargs):
