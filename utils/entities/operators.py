@@ -64,9 +64,8 @@ class Output(Operator):
     def check(self, schema: Dict[str, SchemaFieldType], schema_to_compare: Optional[Dict[str, str]] = None,
               title_name: Optional[str] = None):
         if schema_to_compare is not None:
-            for field in schema_to_compare.keys():
-                if field not in schema:
-                    raise ValueError(f'Поле "{title_name}" в схеме не найдено!')
+            if schema.keys() != schema_to_compare.keys():
+                raise ValueError(f'Несоответствие полей: {schema.keys()} != {schema_to_compare.keys()}!')
         elif title_name is not None:
             if title_name not in schema:
                 raise ValueError(f'Поле "{title_name}" в схеме не найдено!')
@@ -102,12 +101,22 @@ class FieldDeleter(Operator):
 class FieldChanger(Operator):
     field_name: str = None
     value: str = None
+    new_type: Optional[SchemaFieldType] = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.new_type is not None:
+            self.new_type = SchemaFieldType(self.new_type)
 
     def check(self, schema: Dict[str, SchemaFieldType], **kwargs):
         if self.field_name not in schema:
             raise ValueError(f'Поле "{self.field_name}" в схеме не найдено!')
         try:
-            eval(self.value, {'item': {key: value.get_example_value() for key, value in schema.items()}})
+            eval_result = eval(self.value, {'item': {key: value.get_example_value() for key, value in schema.items()}})
+            if self.new_type is None:
+                SchemaFieldType.get_python_type_by_field_type(schema[self.field_name])(eval_result)
+            else:
+                SchemaFieldType.get_python_type_by_field_type(self.new_type)(eval_result)
         except Exception:
             exception_class, exception_object, _ = sys.exc_info()
             if IGNORE_EXCEPTIONS is None:

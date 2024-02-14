@@ -12,7 +12,7 @@ if __name__ == '__main__':
     LOGGER.info('Waiting Kafka-container...')
     for _ in range(100):
         try:
-            consumer = KafkaConsumer('processed_data',
+            consumer = KafkaConsumer('person_calls',
                                      bootstrap_servers=[os.environ['KAFKA_ADDRESS']],
                                      auto_offset_reset='earliest',
                                      value_deserializer=lambda v: json.loads(v.decode('utf-8')))

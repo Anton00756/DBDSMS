@@ -1,11 +1,11 @@
 from marshmallow import Schema, fields, post_load
 
 from utils.entities import OperatorType, Deduplicator, Filter, Output, Clone, FieldDeleter, FieldChanger, \
-    FieldEnricher, StreamJoiner
+    FieldEnricher, StreamJoiner, SchemaFieldType
 
 
 class DeduplicatorSchema(Schema):
-    source = fields.Str(description="Источник данных", required=True, example='data_with_numbers')
+    source = fields.Str(description="Источник данных", required=True, example='calls')
     key = fields.Str(description="Ключ", required=True, example='number')
     time = fields.Int(description="Время (в секундах)", required=True, example='60')
 
@@ -16,7 +16,7 @@ class DeduplicatorSchema(Schema):
 
 
 class FilterSchema(Schema):
-    source = fields.Str(description="Источник данных", required=True, example='data_with_numbers')
+    source = fields.Str(description="Источник данных", required=True, example='calls')
     expression = fields.Str(description="Выражение", required=True, example="item['number'] == 100")
 
     @post_load
@@ -26,8 +26,8 @@ class FilterSchema(Schema):
 
 
 class OutputSchema(Schema):
-    source = fields.Str(description="Источник данных", required=True, example='data_with_numbers')
-    sink = fields.Str(description="Выходное хранилище", required=True, example='data_with_numbers')
+    source = fields.Str(description="Источник данных", required=True, example='calls')
+    sink = fields.Str(description="Выходное хранилище", required=True, example='calls')
 
     @post_load
     def make_object(self, data, **kwargs):
@@ -36,7 +36,7 @@ class OutputSchema(Schema):
 
 
 class CloneSchema(Schema):
-    source = fields.Str(description="Источник данных", required=True, example='data_with_numbers')
+    source = fields.Str(description="Источник данных", required=True, example='calls')
     clone_name = fields.Str(description="Название копии", required=True, example='clone_data')
 
     @post_load
@@ -46,7 +46,7 @@ class CloneSchema(Schema):
 
 
 class FieldDeleterSchema(Schema):
-    source = fields.Str(description="Источник данных", required=True, example='data_with_numbers')
+    source = fields.Str(description="Источник данных", required=True, example='calls')
     field_name = fields.Str(description="Название поля", required=True, example='number')
 
     @post_load
@@ -56,9 +56,10 @@ class FieldDeleterSchema(Schema):
 
 
 class FieldChangerSchema(Schema):
-    source = fields.Str(description="Источник данных", required=True, example='data_with_numbers')
+    source = fields.Str(description="Источник данных", required=True, example='calls')
     field_name = fields.Str(description="Название поля", required=True, example='number')
     value = fields.Str(description="Новое значение (выражение)", required=True, example="item['number'] + 1")
+    new_type = fields.Enum(SchemaFieldType, description="Новый тип", required=False)
 
     @post_load
     def make_object(self, data, **kwargs):
@@ -67,7 +68,7 @@ class FieldChangerSchema(Schema):
 
 
 class FieldEnricherSchema(Schema):
-    source = fields.Str(description="Источник данных", required=True, example='data_with_numbers')
+    source = fields.Str(description="Источник данных", required=True, example='calls')
     field_name = fields.Str(description="Название нового поля", required=True, example='add_number')
     search_key = fields.Str(description="Ключ (выражение) для поиска", required=True,
                             example="item['string'].split(':')[0]")
@@ -79,7 +80,7 @@ class FieldEnricherSchema(Schema):
 
 
 class StreamJoinerSchema(Schema):
-    source = fields.Str(description="Основной источник данных", required=True, example='data_with_numbers')
+    source = fields.Str(description="Основной источник данных", required=True, example='calls')
     second_source = fields.Str(description="Второстепенный источник данных", required=True, example='clone_data')
     first_key = fields.Str(description="Ключ основного источника", required=True, example='number')
     second_key = fields.Str(description="Ключ второстепенного источника", required=True, example='number')

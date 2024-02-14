@@ -51,8 +51,8 @@ services:
       kafka-topics --bootstrap-server kafka:9092 --list
       
       echo -e 'Creating kafka topics'
-      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic raw_data --replication-factor 3 --partitions 10
-      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic processed_data --replication-factor 3 --partitions 10
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic calls --replication-factor 3 --partitions 10
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic person_calls --replication-factor 3 --partitions 10
       
       echo -e 'Successfully created the following topics:'
       kafka-topics --bootstrap-server kafka:9092 --list
@@ -68,7 +68,6 @@ services:
       - node-network
     volumes:
       - greenplum_data:/srv
-      - ${PWD}/services/greenplum/init.sql:/init.sql
     environment:
       MALLOC_ARENA_MAX: 1
       TZ: Europe/Moscow
@@ -76,8 +75,9 @@ services:
     env_file:
       - ${PWD}/.env
     healthcheck:
-      test: "/usr/local/greenplum-db-6.21.0/bin/pg_isready &&
-        /usr/local/greenplum-db-6.21.0/bin/psql -h ${GP_HOST} -U ${GP_USER} -d ${GP_DB} -f /init.sql"
+#      test: "/usr/local/greenplum-db-6.21.0/bin/pg_isready &&
+#        /usr/local/greenplum-db-6.21.0/bin/psql -h ${GP_HOST} -U ${GP_USER} -d ${GP_DB} -f /init.sql"
+      test: "/usr/local/greenplum-db-6.21.0/bin/pg_isready"
       interval: 1s
       timeout: 3s
       retries: 100
@@ -183,6 +183,8 @@ services:
     container_name: pyflink
     networks:
       - node-network
+    volumes:
+      - ${PWD}/services/orchestrator/config.json:/work_dir/job_config.json
     depends_on:
       init-kafka:
         condition: service_completed_successfully
@@ -227,6 +229,7 @@ services:
       - pyflink
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ${PWD}/services/orchestrator/config.json:/work_dir/service/config.json
     env_file:
       - ${PWD}/services/orchestrator/.env
       - ${PWD}/.env
@@ -240,7 +243,6 @@ services:
       - init-kafka
       - redis
     env_file:
-      - ${PWD}/services/data_generator/.env
       - ${PWD}/.env
 
   result_viewer:

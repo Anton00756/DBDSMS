@@ -58,8 +58,6 @@ class Job(BaseEntity):
             self.operators = {}
             if (init_operators := temp.get('operators')) is not None:
                 for name, operators in init_operators.items():
-                    if name not in self.sources:
-                        raise JobConfigException(f'Неизвестный источник "{name}"!')
                     self.fill_source(name, init_operators)
         else:
             self.sources = {}
@@ -67,8 +65,12 @@ class Job(BaseEntity):
             self.sinks = {}
 
     def fill_source(self, source_name: str, operators: Dict[str, list]):
+        if source_name not in self.sources:
+            raise JobConfigException(f'Неизвестный источник "{source_name}"!')
         if source_name in self.operators:
             return
+        if (source := self.sources[source_name]).source_type == SourceType.CLONE:
+            self.fill_source(getattr(source, 'source'), operators)
         for index, operator in enumerate(source_operators := operators[source_name]):
             if operator['operator_type'] == OperatorType.CLONE.value:
                 if operator['clone_name'] not in self.sources:
@@ -203,6 +205,9 @@ class Job(BaseEntity):
                     current_schema.pop(operator.field_name)
                 elif operator.operator_type == OperatorType.FIELD_ENRICHER:
                     current_schema[operator.field_name] = SchemaFieldType.STRING
+                elif operator.operator_type == OperatorType.FIELD_CHANGER:
+                    if operator.new_type is not None:
+                        current_schema[operator.field_name] = operator.new_type
                 elif operator.operator_type == OperatorType.STREAM_JOINER:
                     new_schema = self.get_source_schema(getattr(operator, 'second_source'))
                     new_schema.update(current_schema)
@@ -231,7 +236,7 @@ class Job(BaseEntity):
                 if sink_entity.sink_type == SinkType.GREENPLUM:
                     operator.check(self.get_source_schema(source), schema_to_compare=getattr(sink_entity, 'schema'))
                 elif sink_entity.sink_type == SinkType.MINIO:
-                    operator.check(self.get_source_schema(source), title_name=getattr(sink_entity, 'title_name'))
+                    operator.check(self.get_source_schema(source), title_name=getattr(sink_entity, 'title_field'))
             elif operator.operator_type == OperatorType.STREAM_JOINER:
                 if (second_source := getattr(operator, 'second_source')) not in self.sources:
                     raise JobConfigException(f'Неизвестный источник "{second_source}"!')
@@ -282,6 +287,9 @@ class Job(BaseEntity):
                         schema.pop(getattr(operator, 'field_name'))
                     elif operator.operator_type == OperatorType.FIELD_ENRICHER:
                         schema[getattr(operator, 'field_name')] = SchemaFieldType.STRING
+                    elif operator.operator_type == OperatorType.FIELD_CHANGER:
+                        if getattr(operator, 'new_type') is not None:
+                            schema[getattr(operator, 'field_name')] = getattr(operator, 'new_type')
                     elif operator.operator_type == OperatorType.STREAM_JOINER:
                         new_schema = self.get_source_schema(getattr(operator, 'second_source'))
                         new_schema.update(schema)
@@ -312,6 +320,9 @@ class Job(BaseEntity):
                             current_schema.pop(operator.field_name)
                         elif operator.operator_type == OperatorType.FIELD_ENRICHER:
                             current_schema[operator.field_name] = SchemaFieldType.STRING
+                        elif operator.operator_type == OperatorType.FIELD_CHANGER:
+                            if operator.new_type is not None:
+                                current_schema[operator.field_name] = operator.new_type
                         elif operator.operator_type == OperatorType.STREAM_JOINER:
                             new_schema = self.get_source_schema(getattr(operator, 'second_source'))
                             new_schema.update(current_schema)
@@ -324,6 +335,9 @@ class Job(BaseEntity):
                         current_schema.pop(operator.field_name)
                     elif operator.operator_type == OperatorType.FIELD_ENRICHER:
                         current_schema[operator.field_name] = SchemaFieldType.STRING
+                    elif operator.operator_type == OperatorType.FIELD_CHANGER:
+                        if operator.new_type is not None:
+                            current_schema[operator.field_name] = operator.new_type
                     elif operator.operator_type == OperatorType.STREAM_JOINER:
                         new_schema = self.get_source_schema(getattr(operator, 'second_source'))
                         new_schema.update(current_schema)
@@ -366,7 +380,8 @@ class Job(BaseEntity):
         if (operator := self.operators[source_name][pos]).operator_type == OperatorType.CLONE:
             self.delete_cloned_sources(getattr(self.operators[source_name][pos], 'clone_name'))
         elif operator.operator_type == OperatorType.FIELD_DELETER or \
-                operator.operator_type == OperatorType.FIELD_ENRICHER:
+                operator.operator_type == OperatorType.FIELD_ENRICHER or \
+                operator.operator_type == OperatorType.FIELD_CHANGER:
             self.check_operator_dependence(source_name, operator)
         elif operator.operator_type == OperatorType.STREAM_JOINER:
             self.check_operator_dependence(source_name, operator)

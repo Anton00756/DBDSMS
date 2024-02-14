@@ -12,13 +12,13 @@ class SchemaFieldType(enum.Enum):
         return self.value
 
     @staticmethod
+    def get_python_type_by_field_type(field_type):
+        return FIELD_TYPE_TO_PYTHON[field_type]
+
+    @staticmethod
     def convert_type(in_type, value):
-        in_types = {SchemaFieldType.BOOL: bool, SchemaFieldType.INT: int, SchemaFieldType.DOUBLE: float,
-                    SchemaFieldType.STRING: str}
-        out_types = {bool: SchemaFieldType.BOOL, int: SchemaFieldType.INT, float: SchemaFieldType.DOUBLE,
-                     str: SchemaFieldType.STRING}
         try:
-            return out_types.get(type(in_types.get(in_type)(value)))
+            return PYTHON_TYPE_TO_FIELD.get(type(SchemaFieldType.get_python_type_by_field_type(in_type)(value)))
         except ValueError:
             return SchemaFieldType.STRING
 
@@ -31,6 +31,14 @@ class SchemaFieldType(enum.Enum):
             return 0.0
         if self == SchemaFieldType.STRING:
             return 'string'
+
+
+FIELD_TYPE_TO_PYTHON = {
+    SchemaFieldType.BOOL: bool, SchemaFieldType.INT: int, SchemaFieldType.DOUBLE: float, SchemaFieldType.STRING: str
+}
+PYTHON_TYPE_TO_FIELD = {
+    bool: SchemaFieldType.BOOL, int: SchemaFieldType.INT, float: SchemaFieldType.DOUBLE, str: SchemaFieldType.STRING
+}
 
 
 class SourceType(enum.Enum):

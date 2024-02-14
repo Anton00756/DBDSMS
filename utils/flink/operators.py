@@ -1,3 +1,5 @@
+from typing import List, Set
+
 from pyflink.common import Time
 from pyflink.common.typeinfo import Types, TypeInformation, RowTypeInfo
 from pyflink.common.types import Row
@@ -37,52 +39,60 @@ class Deduplicator(FlatMapFunction):
             yield value
 
 
-class UpdateEnrichment(MapFunction):
-    def __init__(self, host: str, port: int):
-        self.host = host
-        self.port = port
-        self.conn = None
-
-    def open(self, runtime_context: RuntimeContext):
-        self.conn = Redis(self.host, self.port)
+class FieldUpdater(MapFunction):
+    def __init__(self, field_name: str, field_value: str, field_type):
+        self.field_name = field_name
+        self.field_value = field_value
+        self.field_type = field_type
 
     def map(self, value):
-        if (field := self.conn.get(value['string'])) is not None:
-            value['string'] += f":{field.decode('utf-8')}"
+        value[self.field_name] = self.field_type(eval(self.field_value, {'item': value}))
         return value
 
-    def close(self):
-        self.conn.close()
+
+class FieldDeleter(MapFunction):
+    def __init__(self, fields: List[str]):
+        self.fields = fields
+        self.row_generator = Row(*fields)
+
+    def map(self, value):
+        return self.row_generator(*[value[key] for key in self.fields])
 
 
-class AddEnrichment(MapFunction):
-    def __init__(self, host: str, port: int):
+class FieldEnricher(MapFunction):
+    def __init__(self, host: str, port: int, field_name: str, search_key: str, fields: List[str]):
         self.host = host
         self.port = port
         self.conn = None
-        self.row_generator = Row("number", "string", "string2")
+        self.field_name = field_name
+        self.search_key = search_key
+        self.fields = fields
+        self.row_generator = Row(*fields)
 
     def open(self, runtime_context: RuntimeContext):
         self.conn = Redis(self.host, self.port)
 
     def map(self, value):
-        if (field := self.conn.get(value['string'].split(":")[0])) is not None:
-            new_row = self.row_generator(value['number'], value['string'], field.decode('utf-8'))
-        else:
-            new_row = self.row_generator(value['number'], value['string'], "")
-        return new_row
+        new_field = str(eval(self.search_key, {'item': value})) if (field := self.conn.get(
+            str(eval(self.search_key, {'item': value})))) is None \
+            else field.decode('utf-8')
+        return self.row_generator(*[value[key] if key != self.field_name else new_field for key in self.fields])
 
     def close(self):
         self.conn.close()
 
 
 class StreamJoiner(CoFlatMapFunction):
-    def __init__(self, time_to_live: Time, first_template: tuple, second_template: tuple):
+    def __init__(self, time_to_live: Time, first_template: tuple, second_template: tuple, result_fields: List[str],
+                 main_fields: Set[str]):
         self.ttl = time_to_live
         self.first_template = Types.ROW_NAMED(*first_template)
         self.second_template = Types.ROW_NAMED(*second_template)
         self.first_stream_value = None
         self.second_stream_value = None
+        self.result_fields = result_fields
+        self.row_generator = Row(*result_fields)
+        self.main_fields = main_fields
 
     def open(self, runtime_context: RuntimeContext):
         state_ttl_config = StateTtlConfig \
@@ -104,8 +114,8 @@ class StreamJoiner(CoFlatMapFunction):
         else:
             buffer_value = self.second_stream_value.value()
             self.second_stream_value.clear()
-            row_generator = Row("number", "string", "string2")
-            yield row_generator(value['number'], value['string'], buffer_value['reversed_string'])
+            yield self.row_generator(*[value[key] if key in self.main_fields else buffer_value[key]
+                                       for key in self.result_fields])
 
     def flat_map2(self, value):
         if self.first_stream_value.value() is None:
@@ -113,5 +123,5 @@ class StreamJoiner(CoFlatMapFunction):
         else:
             buffer_value = self.first_stream_value.value()
             self.first_stream_value.clear()
-            row_generator = Row("number", "string", "string2")
-            yield row_generator(value['number'], buffer_value['string'], value['reversed_string'])
+            yield self.row_generator(*[value[key] if key not in self.main_fields else buffer_value[key]
+                                       for key in self.result_fields])

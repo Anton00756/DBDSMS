@@ -21,6 +21,7 @@ class KafkaSink(Sink):
 @dataclass
 class GreenplumSink(Sink):
     table: str = None
+    database: str = None
     schema: Dict[str, str] = None
     init_sql: str = None
 

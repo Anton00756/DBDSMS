@@ -7,7 +7,7 @@ from utils.entities import GreenplumSink, KafkaSink, MinioSink, SinkType
 
 class KafkaSinkSchema(Schema):
     address = fields.Str(description="Адрес", required=True, example='kafka:9092')
-    topic = fields.Str(description="Топик", required=True, example='data_with_numbers')
+    topic = fields.Str(description="Топик", required=True, example='person_calls')
 
     @post_load
     def make_object(self, data, **kwargs):
@@ -25,13 +25,12 @@ class PostKafkaSinkSchema(KafkaSinkSchema):
 
 class GreenplumSinkSchema(Schema):
     address = fields.Str(description="Адрес", required=True, example='greenplum:5432')
-    table = fields.Str(description="Таблица", required=True, example='processed_data_db')
+    database = fields.Str(description="База данных", required=True, example='processed_data_db')
+    table = fields.Str(description="Таблица", required=True, example='person_and_call_time')
     init_sql = fields.Str(description="SQL-скрипт для инициализации", required=True,
-                          example='create table if not exists results (number bigint not null, message text, '
-                                  'add_message text)')
+                          example='create table if not exists person_and_call_time (message person, call_time float)')
     schema = fields.Dict(keys=fields.Str(), values=fields.Str(), description="Схема [JSON-поле - поле в базе]",
-                         required=True, example=json.dumps({'number': 'number', 'string': 'message',
-                                                            'string2': 'add_message'}, indent=4))
+                         required=True, example=json.dumps({'person': 'person', 'time': 'time'}, indent=4))
 
     @post_load
     def make_object(self, data, **kwargs):
