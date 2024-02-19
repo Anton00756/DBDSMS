@@ -6,7 +6,6 @@ from kafka import KafkaConsumer, errors
 
 from utils import helper
 
-
 if __name__ == '__main__':
     LOGGER = helper.get_logger()
     LOGGER.info('Waiting Kafka-container...')
@@ -23,4 +22,3 @@ if __name__ == '__main__':
             time.sleep(0.2)
     else:
         LOGGER.error('Could not connect to Kafka')
-

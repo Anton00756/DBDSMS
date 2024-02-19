@@ -4,8 +4,8 @@ import random
 import time
 
 from kafka import KafkaProducer, errors
-
 from redis import Redis
+
 from utils import helper
 
 PERSON_COUNT = 1000
@@ -13,7 +13,7 @@ DUPLICATE_FACTOR = 2
 
 
 def person_numbers(count: int):
-    for i in range(count):
+    for i in range(100, count):
         yield str(i + 1000000), f'Person №{i}'
 
 

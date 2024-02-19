@@ -3,7 +3,7 @@ import os
 from typing import Optional
 
 from utils import helper
-from utils.entities import Settings, Job, KafkaSource, Sink, JobConfigException, Operator, Output
+from utils.entities import Settings, Job, KafkaSource, Sink, JobConfigException, Operator
 
 LOGGER = helper.get_logger()
 

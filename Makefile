@@ -24,6 +24,9 @@ up: down delete_trash
 run:
 	@docker exec pyflink /opt/flink/bin/flink run -py /work_dir/service/processor.py
 
+generator:
+	@docker restart data_generator
+
 down:
 	@docker-compose -p cdaps down
 
@@ -31,9 +34,6 @@ enter:
 	@docker exec -it $(image) sh
 
 exec:
-    ifeq ($(image), data_generator)
-		@docker exec data_generator sh -c "python service/generator.py"
-    endif
     ifeq ($(image), result_viewer)
 		@docker exec result_viewer sh -c "python service/viewer.py"
     endif

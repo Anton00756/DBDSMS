@@ -2,7 +2,6 @@ import os
 
 import psycopg2
 
-
 if __name__ == '__main__':
     try:
         with psycopg2.connect(host=os.environ['GP_HOST'], port=os.environ['GP_PORT'], dbname=os.environ['GP_DB'],

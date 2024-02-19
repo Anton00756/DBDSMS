@@ -5,7 +5,6 @@ from typing import Dict, Optional
 
 from .base import BaseEntity, OperatorType, SchemaFieldType
 
-
 IGNORE_EXCEPTIONS: Optional[list] = None
 
 

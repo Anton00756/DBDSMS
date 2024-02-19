@@ -1,6 +1,6 @@
 from marshmallow import Schema, fields, post_load
-from utils.entities import Settings, Job
-from .sources import SourceSchema
+
+from utils.entities import Settings
 from .json_field import JSON
 
 

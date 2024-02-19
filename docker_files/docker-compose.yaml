@@ -75,8 +75,8 @@ services:
     env_file:
       - ${PWD}/.env
     healthcheck:
-#      test: "/usr/local/greenplum-db-6.21.0/bin/pg_isready &&
-#        /usr/local/greenplum-db-6.21.0/bin/psql -h ${GP_HOST} -U ${GP_USER} -d ${GP_DB} -f /init.sql"
+      #      test: "/usr/local/greenplum-db-6.21.0/bin/pg_isready &&
+      #        /usr/local/greenplum-db-6.21.0/bin/psql -h ${GP_HOST} -U ${GP_USER} -d ${GP_DB} -f /init.sql"
       test: "/usr/local/greenplum-db-6.21.0/bin/pg_isready"
       interval: 1s
       timeout: 3s

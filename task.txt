@@ -2,12 +2,12 @@
 Distributed BigData Streaming Management System
 [DBDSMS]
 
-job by json / yaml
-Метрики внутри операторов
+job by json / yaml +
+Метрики внутри операторов +
 
 Контейнер-оркестратор:
-    Валидация yaml`a до старта flink`a / job`ы [аля health_check]
-    Автогенерация по yaml`у для Grafana: каждую метрику отдельно [?]
+    Валидация yaml`a до старта flink`a / job`ы [аля health_check] +
+    Автогенерация по yaml`у для Grafana: каждую метрику отдельно +
 
 Source, sink; +
 Операции:

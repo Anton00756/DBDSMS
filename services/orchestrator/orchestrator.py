@@ -15,7 +15,6 @@ from utils.config_manager import ConfigManager
 from utils.data_manager import DataManager
 from utils.docker_engine import DockerEngine
 
-
 if (env_data := os.environ.get('IGNORE_EXCEPTIONS_DURING_VALIDATION')) is not None:
     setattr(sys.modules['utils.entities.operators'], 'IGNORE_EXCEPTIONS', env_data.split(','))
 api = Flask(__name__)

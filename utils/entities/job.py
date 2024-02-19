@@ -4,10 +4,10 @@ from typing import Dict, Union, Optional, List
 
 from utils import helper
 from .base import BaseEntity, SinkType, OperatorType, SourceType, SchemaFieldType
-from .sinks import Sink, GreenplumSink, KafkaSink, MinioSink
-from .sources import KafkaSource, Source, CloneSource
 from .operators import Operator, Deduplicator, Filter, Output, Clone, FieldDeleter, FieldEnricher, FieldChanger, \
     StreamJoiner, StreamJoinerPlug
+from .sinks import Sink, GreenplumSink, KafkaSink, MinioSink
+from .sources import KafkaSource, Source, CloneSource
 
 LOGGER = helper.get_logger()
 
@@ -113,7 +113,7 @@ class Job(BaseEntity):
 
     @staticmethod
     def create_necessary_operator(operator: dict) -> Union[Deduplicator, Filter, Output, Clone, FieldDeleter,
-                                                           FieldChanger, FieldEnricher, StreamJoiner, StreamJoinerPlug]:
+    FieldChanger, FieldEnricher, StreamJoiner, StreamJoinerPlug]:
         if (operator_type := operator.get('operator_type')) in OPERATOR_CONVERTER:
             return OPERATOR_CONVERTER[operator_type](**operator)
         raise JobConfigException('Неизвестный тип оператора!')

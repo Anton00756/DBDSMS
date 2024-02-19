@@ -1,13 +1,12 @@
-import json
-import os
 import copy
-from typing import Optional, Dict, Union
+import os
+import time
+from typing import Dict
 
 import psycopg2
-from pyflink.common import Time, WatermarkStrategy, Duration
+from pyflink.common import Time
 from pyflink.common.typeinfo import Types
 from pyflink.datastream import StreamExecutionEnvironment, DataStream
-from pyflink.table import StreamTableEnvironment
 from pyflink.datastream.checkpointing_mode import CheckpointingMode
 from pyflink.datastream.connectors import FlinkKafkaConsumer, FlinkKafkaProducer, JdbcSink, JdbcConnectionOptions, \
     FileSink
@@ -16,10 +15,10 @@ from pyflink.datastream.formats.json import JsonRowDeserializationSchema, JsonRo
 
 from utils import helper
 from utils.config_manager import ConfigManager
-from utils.entities import Job, Settings, SourceType, KafkaSource, SchemaFieldType, SinkType, KafkaSink, MinioSink, \
-    GreenplumSink, OperatorType
-from utils.flink import JsonEncoder, KeyBucketAssigner, Deduplicator, UpdateEnrichment, FieldEnricher, StreamJoiner, \
-    FieldUpdater, FieldDeleter
+from utils.entities import Job, SourceType, SchemaFieldType, SinkType, OperatorType
+from utils.flink import JsonEncoder, KeyBucketAssigner, Deduplicator, FieldEnricher, StreamJoiner, FieldUpdater, \
+    FieldDeleter, Filter
+from utils.grafana_builder import GrafanaBuilder
 
 LOGGER = helper.get_logger()
 
@@ -36,20 +35,23 @@ class JobExecutor:
         self.compiled_sources = set()
         self.clones = {}
         self.streams_to_join = {}
+        self.grafana_builder = GrafanaBuilder()
 
     def prepare_flink_env(self):
         [self.environment.add_jars(f"file:///{jar}") for jar in os.environ['JAR_FILES'].split(';')]
         self.environment.enable_checkpointing(30000, CheckpointingMode.EXACTLY_ONCE)
         self.environment.get_checkpoint_config().enable_unaligned_checkpoints()
+        self.environment.get_checkpoint_config().set_max_concurrent_checkpoints(1)
+        self.environment.get_checkpoint_config().set_checkpoint_timeout(60000)
         settings = self.job.settings
         if settings is None:
-            self.environment.get_checkpoint_config().set_min_pause_between_checkpoints(60000)
+            self.environment.get_checkpoint_config().set_min_pause_between_checkpoints(5000)
             self.environment.get_checkpoint_config().set_checkpoint_interval(30000)
         else:
             if settings.parallelism is not None:
                 self.environment.set_parallelism(settings.parallelism)
             self.environment.get_checkpoint_config().set_min_pause_between_checkpoints(
-                60000 if settings.min_pause_between_checkpoints is None else settings.min_pause_between_checkpoints
+                5000 if settings.min_pause_between_checkpoints is None else settings.min_pause_between_checkpoints
             )
             self.environment.get_checkpoint_config().set_checkpoint_interval(
                 30000 if settings.checkpoint_interval is None else settings.checkpoint_interval
@@ -107,7 +109,7 @@ class JobExecutor:
                 f'insert into {getattr(sink, "table")}'
                 f'({", ".join(sink_schema[field] for field in sorted(sink_schema.keys()))}) '
                 f'VALUES({", ".join(["?"] * len(sink_schema))})',
-                type_info=self.get_named_row_by_schema({field: schema[field] for field in sink_schema}),
+                type_info=self.get_named_row_by_schema(schema),
                 jdbc_connection_options=greenplum_options
             )
             datastream.add_sink(greenplum_sink)
@@ -122,14 +124,16 @@ class JobExecutor:
         else:
             datastream = self.add_source(source_name)
             schema = getattr(source, 'schema')
-        for operator in self.job.operators[source_name]:
+        for index, operator in enumerate(self.job.operators[source_name]):
             if operator.operator_type == OperatorType.DEDUPLICATOR:
-                datastream = datastream.key_by(lambda item: item[getattr(operator, 'key')]) \
-                    .flat_map(Deduplicator(Time.seconds(getattr(operator, 'time'))),
-                              output_type=self.get_named_row_by_schema(schema))
-            elif operator.operator_type == OperatorType.FILTER:
-                datastream = datastream.filter(lambda item: eval(getattr(operator, 'expression'), {'item': item}))
                 self.add_sink(datastream, 'kafka_sink', schema)
+                datastream = datastream.key_by(lambda item: item[getattr(operator, 'key')]) \
+                    .process(Deduplicator(Time.seconds(getattr(operator, 'time')), f'{source_name}:{index}'),
+                             output_type=self.get_named_row_by_schema(schema))
+                self.grafana_builder.add_deduplicator(source_name, index)
+            elif operator.operator_type == OperatorType.FILTER:
+                datastream = datastream.flat_map(Filter(getattr(operator, 'expression'), f'{source_name}:{index}'))
+                self.grafana_builder.add_filter(source_name, index)
             elif operator.operator_type == OperatorType.CLONE:
                 self.clones[getattr(operator, 'clone_name')] = (datastream, copy.deepcopy(schema))
             elif operator.operator_type == OperatorType.FIELD_DELETER:
@@ -141,8 +145,9 @@ class JobExecutor:
                 schema[field_name] = SchemaFieldType.STRING
                 datastream = datastream.map(FieldEnricher(
                     os.environ['REDIS_HOST'], int(os.environ['REDIS_PORT']), field_name,
-                    getattr(operator, 'search_key'), sorted(schema.keys())),
+                    getattr(operator, 'search_key'), sorted(schema.keys()), f'{source_name}:{index}'),
                     output_type=self.get_named_row_by_schema(schema))
+                self.grafana_builder.add_enricher(source_name, index)
             elif operator.operator_type == OperatorType.FIELD_CHANGER:
                 field_name = getattr(operator, 'field_name')
                 if (new_type := getattr(operator, 'new_type')) is not None:
@@ -161,9 +166,10 @@ class JobExecutor:
                 schema = second_schema
                 datastream = datastream.connect(second_datastream). \
                     key_by(lambda x: x[getattr(operator, 'first_key')], lambda y: y[getattr(operator, 'second_key')]) \
-                    .flat_map(StreamJoiner(Time.seconds(getattr(operator, 'time')), first_template, second_template,
-                                           sorted(schema.keys()), main_source_keys),
-                              output_type=self.get_named_row_by_schema(schema))
+                    .process(StreamJoiner(Time.seconds(getattr(operator, 'time')), first_template, second_template,
+                                          sorted(schema.keys()), main_source_keys, f'{source_name}:{index}'),
+                             output_type=self.get_named_row_by_schema(schema))
+                self.grafana_builder.add_stream_joiner(source_name, index, second_source)
             elif operator.operator_type == OperatorType.STREAM_JOINER_PLUG:
                 self.streams_to_join[source_name] = (datastream, copy.deepcopy(schema))
             else:
@@ -174,16 +180,20 @@ class JobExecutor:
         self.prepare_flink_env()
         for name, sink in self.job.sinks.items():
             if sink.sink_type == SinkType.GREENPLUM:
-                try:
-                    host, port = sink.address.split(':')
-                    with psycopg2.connect(host=host, port=port, dbname=getattr(sink, 'database'),
-                                          user=os.environ['GP_USER'], password=os.environ['GP_PASSWORD']) as conn:
-                        with conn.cursor() as cur:
-                            cur.execute(getattr(sink, 'init_sql'))
-                except psycopg2.OperationalError:
-                    LOGGER.error(f'Could not init Greenplum sink with name "{name}"')
+                for retry in range(1, 101):
+                    try:
+                        host, port = sink.address.split(':')
+                        with psycopg2.connect(host=host, port=port, dbname=getattr(sink, 'database'),
+                                              user=os.environ['GP_USER'], password=os.environ['GP_PASSWORD']) as conn:
+                            with conn.cursor() as cur:
+                                cur.execute(getattr(sink, 'init_sql'))
+                        break
+                    except psycopg2.OperationalError:
+                        LOGGER.error(f'[{retry}] Could not init Greenplum sink with name "{name}"')
+                        time.sleep(1)
         for source_name in self.job.operators.keys():
             self.process_datastream(source_name)
+        self.grafana_builder.save('service/grafana.json')
         self.environment.execute()
 
 
