@@ -193,7 +193,7 @@ class JobExecutor:
                         time.sleep(1)
         for source_name in self.job.operators.keys():
             self.process_datastream(source_name)
-        self.grafana_builder.save('service/grafana.json')
+        self.grafana_builder.save('shared_data/grafana.json')
         self.environment.execute()
 
 

@@ -101,6 +101,12 @@ volumes:
     driver: local
   grafana_data:
     driver: local
+  shared_data:
+    driver: local
+    driver_opts:
+        type: none
+        o: bind
+        device: ${PWD}/services/shared_data
 
 networks:
   node-network:

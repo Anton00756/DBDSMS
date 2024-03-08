@@ -1,3 +1,5 @@
+import os
+
 import marshmallow
 import yaml
 from flask import Blueprint
@@ -196,5 +198,28 @@ def get_blueprint(data: DataManager, configer: ConfigManager, docker: DockerEngi
             return make_response(ErrorSchema().dump({'error': error}), 400)
         except JobConfigException as error:
             return make_response(ErrorSchema().dump({'error': error}), 409)
+
+    @api.route('/job/get_grafana', methods=['GET'])
+    def get_grafana_json():
+        """
+        ---
+        get:
+            summary: Отобразить шаблон для Grafana в JSON-формате
+            responses:
+                '200':
+                    description: Содержимое шаблона
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                '404':
+                    description: Файл не найден
+            tags:
+                - job
+        """
+        if not os.path.exists('shared_data/grafana.json'):
+            return make_response('Файл не найден!', 404)
+        with open('shared_data/grafana.json', 'r') as file:
+            return make_response(file.read(), 200)
 
     return api

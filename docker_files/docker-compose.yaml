@@ -184,7 +184,7 @@ services:
     networks:
       - node-network
     volumes:
-      - ${PWD}/services/orchestrator/config.json:/work_dir/job_config.json
+      - shared_data:/work_dir/shared_data
     depends_on:
       init-kafka:
         condition: service_completed_successfully
@@ -229,7 +229,7 @@ services:
       - pyflink
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${PWD}/services/orchestrator/config.json:/work_dir/service/config.json
+      - shared_data:/work_dir/shared_data
     env_file:
       - ${PWD}/services/orchestrator/.env
       - ${PWD}/.env
@@ -271,6 +271,8 @@ volumes:
   prometheus_data:
     driver: local
   grafana_data:
+    driver: local
+  shared_data:
     driver: local
 
 networks:
