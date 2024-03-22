@@ -5,7 +5,7 @@ from typing import Dict, Union, Optional, List
 from utils import helper
 from .base import BaseEntity, SinkType, OperatorType, SourceType, SchemaFieldType
 from .operators import Operator, Deduplicator, Filter, Output, Clone, FieldDeleter, FieldEnricher, FieldChanger, \
-    StreamJoiner, StreamJoinerPlug
+    FieldCreator, StreamJoiner, StreamJoinerPlug
 from .sinks import Sink, GreenplumSink, KafkaSink, MinioSink
 from .sources import KafkaSource, Source, CloneSource
 
@@ -18,6 +18,7 @@ OPERATOR_CONVERTER = {
     OperatorType.CLONE.value: Clone,
     OperatorType.FIELD_DELETER.value: FieldDeleter,
     OperatorType.FIELD_CHANGER.value: FieldChanger,
+    OperatorType.FIELD_CREATOR.value: FieldCreator,
     OperatorType.FIELD_ENRICHER.value: FieldEnricher,
     OperatorType.STREAM_JOINER.value: StreamJoiner,
     OperatorType.STREAM_JOINER_PLUG.value: StreamJoinerPlug
@@ -112,8 +113,9 @@ class Job(BaseEntity):
             raise JobConfigException('Неизвестный тип хранилища!')
 
     @staticmethod
-    def create_necessary_operator(operator: dict) -> Union[Deduplicator, Filter, Output, Clone, FieldDeleter,
-    FieldChanger, FieldEnricher, StreamJoiner, StreamJoinerPlug]:
+    def create_necessary_operator(operator: dict) \
+            -> Union[Deduplicator, Filter, Output, Clone, FieldDeleter, FieldChanger, FieldCreator, FieldEnricher,
+                     StreamJoiner, StreamJoinerPlug]:
         if (operator_type := operator.get('operator_type')) in OPERATOR_CONVERTER:
             return OPERATOR_CONVERTER[operator_type](**operator)
         raise JobConfigException('Неизвестный тип оператора!')
@@ -205,6 +207,8 @@ class Job(BaseEntity):
                     current_schema.pop(operator.field_name)
                 elif operator.operator_type == OperatorType.FIELD_ENRICHER:
                     current_schema[operator.field_name] = SchemaFieldType.STRING
+                elif operator.operator_type == OperatorType.FIELD_CREATOR:
+                    current_schema[operator.field_name] = operator.field_type
                 elif operator.operator_type == OperatorType.FIELD_CHANGER:
                     if operator.new_type is not None:
                         current_schema[operator.field_name] = operator.new_type
@@ -287,6 +291,8 @@ class Job(BaseEntity):
                         schema.pop(getattr(operator, 'field_name'))
                     elif operator.operator_type == OperatorType.FIELD_ENRICHER:
                         schema[getattr(operator, 'field_name')] = SchemaFieldType.STRING
+                    elif operator.operator_type == OperatorType.FIELD_CREATOR:
+                        schema[getattr(operator, 'field_name')] = getattr(operator, 'field_type')
                     elif operator.operator_type == OperatorType.FIELD_CHANGER:
                         if getattr(operator, 'new_type') is not None:
                             schema[getattr(operator, 'field_name')] = getattr(operator, 'new_type')
@@ -296,7 +302,8 @@ class Job(BaseEntity):
                         schema = new_schema
 
     def check_operator_dependence(self, source_name: str,
-                                  aim_operator: Union[FieldDeleter, FieldEnricher, StreamJoiner]):
+                                  aim_operator: Union[FieldDeleter, FieldEnricher, FieldChanger, FieldCreator,
+                                                      StreamJoiner]):
         source_stack = []
         current_source = source_name
         while self.sources[current_source].source_type == SourceType.CLONE:
@@ -320,6 +327,8 @@ class Job(BaseEntity):
                             current_schema.pop(operator.field_name)
                         elif operator.operator_type == OperatorType.FIELD_ENRICHER:
                             current_schema[operator.field_name] = SchemaFieldType.STRING
+                        elif operator.operator_type == OperatorType.FIELD_CREATOR:
+                            current_schema[operator.field_name] = operator.field_type
                         elif operator.operator_type == OperatorType.FIELD_CHANGER:
                             if operator.new_type is not None:
                                 current_schema[operator.field_name] = operator.new_type
@@ -335,6 +344,8 @@ class Job(BaseEntity):
                         current_schema.pop(operator.field_name)
                     elif operator.operator_type == OperatorType.FIELD_ENRICHER:
                         current_schema[operator.field_name] = SchemaFieldType.STRING
+                    elif operator.operator_type == OperatorType.FIELD_CREATOR:
+                        current_schema[operator.field_name] = operator.field_type
                     elif operator.operator_type == OperatorType.FIELD_CHANGER:
                         if operator.new_type is not None:
                             current_schema[operator.field_name] = operator.new_type
@@ -379,9 +390,8 @@ class Job(BaseEntity):
                                      f'pos <= {operator_count - 1}!')
         if (operator := self.operators[source_name][pos]).operator_type == OperatorType.CLONE:
             self.delete_cloned_sources(getattr(self.operators[source_name][pos], 'clone_name'))
-        elif operator.operator_type == OperatorType.FIELD_DELETER or \
-                operator.operator_type == OperatorType.FIELD_ENRICHER or \
-                operator.operator_type == OperatorType.FIELD_CHANGER:
+        elif operator.operator_type in (OperatorType.FIELD_DELETER, OperatorType.FIELD_ENRICHER,
+                                        OperatorType.FIELD_CREATOR, OperatorType.FIELD_CHANGER):
             self.check_operator_dependence(source_name, operator)
         elif operator.operator_type == OperatorType.STREAM_JOINER:
             self.check_operator_dependence(source_name, operator)

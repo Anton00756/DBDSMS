@@ -60,6 +60,19 @@ class Filter(FlatMapFunction):
             yield value
 
 
+class FieldCreator(MapFunction):
+    def __init__(self, field_name: str, field_value: str, field_type, fields: List[str]):
+        self.field_name = field_name
+        self.field_value = field_value
+        self.field_type = field_type
+        self.fields = fields
+        self.row_generator = Row(*fields)
+
+    def map(self, value):
+        return self.row_generator(*[value[key] if key != self.field_name else
+                                    self.field_type(eval(self.field_value, {'item': value})) for key in self.fields])
+
+
 class FieldUpdater(MapFunction):
     def __init__(self, field_name: str, field_value: str, field_type):
         self.field_name = field_name

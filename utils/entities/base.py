@@ -59,6 +59,7 @@ class OperatorType(enum.Enum):
     CLONE = 'clone'
     FIELD_DELETER = 'field_deleter'
     FIELD_CHANGER = 'field_changer'
+    FIELD_CREATOR = 'field_creator'
     FIELD_ENRICHER = 'field_enricher'
     STREAM_JOINER = 'stream_joiner'
     STREAM_JOINER_PLUG = 'stream_joiner_plug'

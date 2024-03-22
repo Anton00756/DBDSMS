@@ -188,6 +188,42 @@ def get_blueprint(configer: ConfigManager):
         except JobConfigException as error:
             return make_response(ErrorSchema().dump({'error': error}), 409)
 
+    @api.route('/operator/add_field_creator', methods=['POST'])
+    def add_field_creator():
+        """
+        ---
+        post:
+            summary: Добавить создание поля
+            parameters:
+                - in: query
+                  schema: FieldCreatorSchema
+            responses:
+                '201':
+                    description: Оператор добавлен
+                '400':
+                    description: Некорректные входные данные
+                    content:
+                        application/json:
+                            schema: ErrorSchema
+                '409':
+                    description: Ошибка при обработке данных
+                    content:
+                        application/json:
+                            schema: ErrorSchema
+            tags:
+                - operator
+        """
+        try:
+            source, operator = FieldCreatorSchema().load(request.args)
+            configer.add_operator(source, operator)
+            return make_response('OK', 201)
+        except marshmallow.exceptions.ValidationError as error:
+            return make_response(ErrorSchema().dump({'error': error}), 400)
+        except ValueError as error:
+            return make_response(ErrorSchema().dump({'error': error}), 400)
+        except JobConfigException as error:
+            return make_response(ErrorSchema().dump({'error': error}), 409)
+
     @api.route('/operator/add_field_deleter', methods=['POST'])
     def add_field_deleter():
         """
