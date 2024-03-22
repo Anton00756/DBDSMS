@@ -15,7 +15,7 @@ def get_blueprint(configer: ConfigManager):
         """
         ---
         post:
-            summary: Добавить источник данных из Kafka
+            summary: Добавить выходное хранилище Kafka
             parameters:
                 - in: query
                   name: params
@@ -53,7 +53,7 @@ def get_blueprint(configer: ConfigManager):
         """
         ---
         post:
-            summary: Добавить источник данных из Greenplum
+            summary: Добавить выходное хранилище Greenplum
             parameters:
                 - in: query
                   name: params
@@ -91,7 +91,7 @@ def get_blueprint(configer: ConfigManager):
         """
         ---
         post:
-            summary: Добавить источник данных из Minio
+            summary: Добавить выходное хранилище Minio
             parameters:
                 - in: query
                   name: params
