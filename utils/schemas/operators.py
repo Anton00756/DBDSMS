@@ -1,7 +1,7 @@
 from marshmallow import Schema, fields, post_load
 
 from utils.entities import OperatorType, Deduplicator, Filter, Output, Clone, FieldDeleter, FieldChanger, \
-    FieldEnricher, StreamJoiner, SchemaFieldType
+    FieldCreator, FieldEnricher, StreamJoiner, SchemaFieldType
 
 
 class DeduplicatorSchema(Schema):
@@ -65,6 +65,18 @@ class FieldChangerSchema(Schema):
     def make_object(self, data, **kwargs):
         source = data.pop('source')
         return source, FieldChanger(operator_type=OperatorType.FIELD_CHANGER, **data)
+
+
+class FieldCreatorSchema(Schema):
+    source = fields.Str(description="Источник данных", required=True, example='calls')
+    field_name = fields.Str(description="Название поля", required=True, example='number')
+    value = fields.Str(description="Новое значение (выражение)", required=True, example="item['number'] + 1")
+    field_type = fields.Enum(SchemaFieldType, description="Тип поля", required=True)
+
+    @post_load
+    def make_object(self, data, **kwargs):
+        source = data.pop('source')
+        return source, FieldCreator(operator_type=OperatorType.FIELD_CREATOR, **data)
 
 
 class FieldEnricherSchema(Schema):

@@ -127,7 +127,41 @@ class FieldChanger(Operator):
                 raise ValueError(f'Ошибка при проверке выражения: {exception_class.__name__}: {exception_object}')
 
     def __str__(self):
-        return f'Изменение поля (название поля: "{self.field_name}", новое значение: "{self.value}")'
+        if self.new_type is None:
+            return f'Изменение поля (название поля: "{self.field_name}", новое значение: "{self.value}")'
+        return f'Изменение поля (название поля: "{self.field_name}", новый тип: "{self.new_type.value}", ' \
+               f'новое значение: "{self.value}")'
+
+
+@dataclass
+class FieldCreator(Operator):
+    field_name: str = None
+    value: str = None
+    field_type: Optional[SchemaFieldType] = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.field_type = SchemaFieldType(self.field_type)
+
+    def check(self, schema: Dict[str, SchemaFieldType], **kwargs):
+        if self.field_name in schema:
+            raise ValueError(f'Поле "{self.field_name}" уже есть в схеме!')
+        try:
+            eval_result = eval(self.value, {'item': {key: value.get_example_value() for key, value in schema.items()}})
+            SchemaFieldType.get_python_type_by_field_type(self.field_type)(eval_result)
+        except Exception:
+            exception_class, exception_object, _ = sys.exc_info()
+            if IGNORE_EXCEPTIONS is None:
+                raise ValueError(f'Ошибка при проверке выражения: {exception_class.__name__}: {exception_object}')
+            for exception in IGNORE_EXCEPTIONS:
+                if exception_class.__name__ == exception:
+                    break
+            else:
+                raise ValueError(f'Ошибка при проверке выражения: {exception_class.__name__}: {exception_object}')
+
+    def __str__(self):
+        return f'Создание поля (название поля: "{self.field_name}", тип: "{self.field_type.value}", ' \
+               f'значение: "{self.value}")'
 
 
 @dataclass

@@ -17,7 +17,7 @@ from utils import helper
 from utils.config_manager import ConfigManager
 from utils.entities import Job, SourceType, SchemaFieldType, SinkType, OperatorType
 from utils.flink import JsonEncoder, KeyBucketAssigner, Deduplicator, FieldEnricher, StreamJoiner, FieldUpdater, \
-    FieldDeleter, Filter
+    FieldDeleter, FieldCreator, Filter
 from utils.grafana_builder import GrafanaBuilder
 
 LOGGER = helper.get_logger()
@@ -148,6 +148,13 @@ class JobExecutor:
                     getattr(operator, 'search_key'), sorted(schema.keys()), f'{source_name}:{index}'),
                     output_type=self.get_named_row_by_schema(schema))
                 self.grafana_builder.add_enricher(source_name, index)
+            elif operator.operator_type == OperatorType.FIELD_CREATOR:
+                field_name = getattr(operator, 'field_name')
+                schema[field_name] = getattr(operator, 'field_type')
+                datastream = datastream.map(FieldCreator(field_name, getattr(operator, 'value'), SchemaFieldType.
+                                                         get_python_type_by_field_type(schema[field_name]),
+                                                         sorted(schema.keys())),
+                                            output_type=self.get_named_row_by_schema(schema))
             elif operator.operator_type == OperatorType.FIELD_CHANGER:
                 field_name = getattr(operator, 'field_name')
                 if (new_type := getattr(operator, 'new_type')) is not None:
